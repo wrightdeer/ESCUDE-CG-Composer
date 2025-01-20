@@ -1,3 +1,14 @@
+# ignore all files in the build/ directory
+build/
+
+# ignore all files in the test/ directory
 test/
+
+# ignore all .png files in the data/ directory and its subdirectories
 data/**/*.png
+
+# ignore all .lsf files in the data/ directory and its subdirectories
 data/**/*.lsf
+
+# ignore the .idea directory
+.idea/
