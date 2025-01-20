@@ -1,24 +1,24 @@
-import sys
 import os
+import sys
 
 import cv2
+import numpy as np
 from PyQt5.QtCore import Qt, QSize, pyqtSignal
 from PyQt5.QtGui import QPixmap, QImage, QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QScrollArea, \
-    QFileDialog, QSizePolicy, QPushButton
+    QFileDialog, QSizePolicy, QPushButton, QMessageBox, QTextEdit  # 添加 QMessageBox 导入
 
 from lsfInfo import LSFFile
 from synthesis_util import synthesis
 
 
 class BottomBarComponent(QWidget):
-    # 修改信号定义，去掉参数
-    index_changed = pyqtSignal()
+    index_changed = pyqtSignal(object)  # 修改信号定义，传递type, sid, index 和自身引用
 
-    def __init__(self, type_str, cv2_image, data_list, index):
+    def __init__(self, type_str, cv2_image, data_list, index, sid=0):
         super().__init__()
         self.type = type_str
-        self.id = id(self)
+        self.sid = sid
         self.data_list = data_list
         self.index = index  # 添加 index 属性
 
@@ -63,7 +63,7 @@ class BottomBarComponent(QWidget):
         bottom_layout.addWidget(left_button)
 
         # 下方文本
-        self.bottom_text_label = QLabel(f"{self.index+1}/{len(self.data_list)}")  # 将 bottom_text_label 设置为实例变量
+        self.bottom_text_label = QLabel(f"{self.index + 1}/{len(self.data_list)}")  # 将 bottom_text_label 设置为实例变量
         self.bottom_text_label.setAlignment(Qt.AlignCenter)
         bottom_layout.addWidget(self.bottom_text_label)
 
@@ -88,14 +88,14 @@ class BottomBarComponent(QWidget):
     def decrement_index(self):
         self.index -= 1
         self.index %= len(self.data_list)
-        self.bottom_text_label.setText(f"{self.index+1}/{len(self.data_list)}")
-        self.index_changed.emit()  # 发射信号，去掉参数
+        self.bottom_text_label.setText(f"{self.index + 1}/{len(self.data_list)}")
+        self.index_changed.emit(self)  # 发射信号，传递自身引用
 
     def increment_index(self):
         self.index += 1
         self.index %= len(self.data_list)
-        self.bottom_text_label.setText(f"{self.index+1}/{len(self.data_list)}")
-        self.index_changed.emit()  # 发射信号，去掉参数
+        self.bottom_text_label.setText(f"{self.index + 1}/{len(self.data_list)}")
+        self.index_changed.emit(self)  # 发射信号，传递自身引用
 
     def reset_image(self, cv2_image):
         # 重新设置图片
@@ -128,7 +128,7 @@ class SynthesisGUI(QMainWindow):
         # 创建菜单栏
         self.menubar = self.menuBar()
         file_menu = self.menubar.addMenu('导入目录')
-        extract_menu = self.menubar.addMenu('提取')
+        extract_menu = self.menubar.addMenu('提取')  # 添加提取菜单
         help_menu = self.menubar.addMenu('帮助')
         exit_menu = self.menubar.addMenu('退出')
 
@@ -141,6 +141,16 @@ class SynthesisGUI(QMainWindow):
         import_action = QAction('导入目录', self)
         import_action.triggered.connect(self.open_directory_dialog)
         file_menu.addAction(import_action)
+
+        # 添加提取菜单项
+        extract_action = QAction('提取图片', self)
+        extract_action.triggered.connect(self.extract_image)  # 连接到 extract_image 方法
+        extract_menu.addAction(extract_action)
+
+        # 添加帮助菜单项
+        help_action = QAction('操作说明', self)
+        help_action.triggered.connect(self.show_help_document)
+        help_menu.addAction(help_action)
 
         # 创建主布局
         self.main_layout = QVBoxLayout()
@@ -193,6 +203,7 @@ class SynthesisGUI(QMainWindow):
         self.fd_key = {}
         self.fe_key = {}
         self.hl_key = 0
+        self.image_counter = 1  # 添加图片计数器
 
     def open_directory_dialog(self):
         # 打开文件夹选择对话框
@@ -222,7 +233,7 @@ class SynthesisGUI(QMainWindow):
                 label.mousePressEvent = lambda event, lbl=label: self.on_label_clicked(lbl)  # 添加点击事件处理
                 self.sidebar_layout.addWidget(label)
                 print(f"添加了子构件：{os.path.splitext(filename)[0]}")
-        
+
         # 设置侧边栏布局的对齐方式为顶部对齐，并设置间距
         self.sidebar_layout.setAlignment(Qt.AlignTop)
         self.sidebar_layout.setSpacing(5)  # 设置子构件之间的间距
@@ -246,12 +257,53 @@ class SynthesisGUI(QMainWindow):
 
         self.clear_bottom_bar_components()  # 清空底边栏子构件
 
-        # 假设我们有一些数据来测试
         operator_blocks = self.lsfData.base_images[self.bi_key]
         image_bi = synthesis(self.lsfData.x, self.lsfData.y, operator_blocks, self.directory)
         data_list = self.lsfData.get_base_images_keys()
         index = 0
         self.add_bottom_bar_component("图片", image_bi, data_list, index)
+
+        for fd_key in self.lsfData.get_face_differences_keys():
+            data_list = self.lsfData.get_face_differences_keys()[fd_key]
+            index = 0
+            fd_image_path =  os.path.join(self.directory, self.lsfData.face_differences[fd_key][data_list[index]].name + '.png')
+            fd_image = cv2.imread(fd_image_path, cv2.IMREAD_UNCHANGED)
+            self.add_bottom_bar_component(f"人脸{fd_key}",fd_image, data_list, index,fd_key)
+
+        for fe_key in self.lsfData.get_face_effects_keys():
+            data_list = self.lsfData.get_face_effects_keys()[fe_key]
+            data_list.insert(0,0)
+            index = 0
+            fe_image = np.zeros((100,100,4))
+            self.add_bottom_bar_component(f"特效{fe_key}",fe_image, data_list, index,fe_key)
+
+        data_list = self.lsfData.get_holy_light_keys()
+        if len(data_list) == 0:
+            return
+        data_list.insert(0,0)
+        index = 0
+        hl_image = np.zeros((100,100,4))
+        self.add_bottom_bar_component("圣光",hl_image, data_list, index,0)
+
+    def extract_image(self):
+        image = self.synthesis_image()
+        if image is None:
+            QMessageBox.warning(self, "警告", "合成图片为空，无法提取。")
+        else:
+            # 生成默认文件名
+            default_file_name = f"synthesized_image_{self.image_counter}.png"
+            file_path, _ = QFileDialog.getSaveFileName(self, "保存图片", default_file_name, "PNG Files (*.png);;All Files (*)")
+            if file_path:
+                # 检查文件名是否重复
+                while os.path.exists(file_path):
+                    self.image_counter += 1
+                    default_file_name = f"synthesized_image_{self.image_counter}.png"
+                    file_path, _ = QFileDialog.getSaveFileName(self, "保存图片", default_file_name, "PNG Files (*.png);;All Files (*)")
+                    if not file_path:
+                        return # 用户取消保存
+                cv2.imwrite(file_path, image)
+                QMessageBox.information(self, "成功", f"图片已保存到 {file_path}")
+                self.image_counter += 1  # 保存成功后增加计数器
 
     def display_cv2_image(self, cv2_image=None):
         if cv2_image is not None:
@@ -274,13 +326,14 @@ class SynthesisGUI(QMainWindow):
         if self.lsfData is not None:
             operation_blocks = self.lsfData.get_operation_blocks(self.bi_key, self.fd_key, self.fe_key, self.hl_key)
 
-            return synthesis(self.lsfData.x, self.lsfData.y,operation_blocks, self.directory)
+            return synthesis(self.lsfData.x, self.lsfData.y, operation_blocks, self.directory)
 
-    def add_bottom_bar_component(self, type_str, cv2_image, data_list, index):
-        component = BottomBarComponent(type_str, cv2_image, data_list, index)
+    def add_bottom_bar_component(self, type_str, cv2_image, data_list, index, sid=0):
+        component = BottomBarComponent(type_str, cv2_image, data_list, index, sid)
         component.index_changed.connect(self.handle_index_change)  # 连接信号到槽函数
         # 控制子控件的高度，不超出底边栏范围
-        component.setMaximumHeight(150)  # 假设最大高度为150
+        component.setMaximumSize(150,150)
+        component.setMinimumSize(150,150)
         self.bottom_bar_layout.addWidget(component)
         self.bottom_bar_layout.setAlignment(Qt.AlignLeft)  # 子控件靠左分布
 
@@ -291,21 +344,68 @@ class SynthesisGUI(QMainWindow):
             if widget is not None:
                 widget.deleteLater()
 
-    def handle_index_change(self):
-        print("Index changed, re-accessing all child components")
-        # 重新访问全部子控件
-        for i in range(self.bottom_bar_layout.count()):
-            widget = self.bottom_bar_layout.itemAt(i).widget()
-            if isinstance(widget, BottomBarComponent):
-                print(f"Component ID: {widget.id}, Type: {widget.type}, Index: {widget.index}")
-                if widget.type == "图片":
-                    self.bi_key = widget.data_list[widget.index]
-                    operator_blocks = self.lsfData.base_images[self.bi_key]
-                    image_bi = synthesis(self.lsfData.x, self.lsfData.y, operator_blocks, self.directory)
-                    widget.reset_image(image_bi)
+    def handle_index_change(self, widget):
+        print(f"Component ID: {widget.sid}, Type: {widget.type}, Index: {widget.index}")
+        if widget.type == "图片":
+            self.bi_key = widget.data_list[widget.index]
+            operator_blocks = self.lsfData.base_images[self.bi_key]
+            image_bi = synthesis(self.lsfData.x, self.lsfData.y, operator_blocks, self.directory)
+            widget.reset_image(image_bi)
+        elif widget.type.startswith("人脸"):
+            fd_key = widget.data_list[widget.index]
+            fd_image_path = os.path.join(self.directory, self.lsfData.face_differences[widget.sid][fd_key].name + '.png')
+            fd_image = cv2.imread(fd_image_path, cv2.IMREAD_UNCHANGED)
+            widget.reset_image(fd_image)
+            self.fd_key[widget.sid] = fd_key
+        elif widget.type.startswith("特效"):
+            fe_key = widget.data_list[widget.index]
+            if fe_key != 0:
+                fe_image_path = os.path.join(self.directory, self.lsfData.face_effects[widget.sid][fe_key].name + '.png')
+                fe_image = cv2.imread(fe_image_path, cv2.IMREAD_UNCHANGED)
+            else:
+                fe_image = np.zeros((100,100,4))
+            widget.reset_image(fe_image)
+            self.fe_key[widget.sid] = fe_key
+        elif widget.type == "圣光":
+            hl_key = widget.data_list[widget.index]
+            if hl_key != 0:
+                hl_image_path = os.path.join(self.directory, self.lsfData.holy_light[hl_key].name + '.png')
+                hl_image = cv2.imread(hl_image_path, cv2.IMREAD_UNCHANGED)
+            else:
+                hl_image = np.zeros((100,100,4))
+            widget.reset_image(hl_image)
+            self.hl_key = hl_key
 
         image = self.synthesis_image()
         self.display_cv2_image(image)
+
+    def show_help_document(self):
+        try:
+            with open('static/help_document.txt', 'r', encoding='utf-8') as file:
+                help_text = file.read()
+            dialog = QMessageBox(self)
+            dialog.setWindowTitle("操作说明")
+            dialog.setText(help_text)
+            dialog.setStandardButtons(QMessageBox.Ok)
+            dialog.setIcon(QMessageBox.Information)
+            
+            # 设置固定宽度和高度
+            dialog.setFixedSize(600, 400)
+            
+            # 使用 QTextEdit 来支持滚动条和自动换行
+            text_edit = QTextEdit()
+            text_edit.setReadOnly(True)
+            text_edit.setLineWrapMode(QTextEdit.WidgetWidth)
+            text_edit.setPlainText(help_text)
+            
+            layout = dialog.layout()
+            layout.addWidget(text_edit, 0, 0, 1, dialog.layout().columnCount())
+            
+            dialog.exec_()
+        except FileNotFoundError:
+            QMessageBox.warning(self, "警告", "操作说明文档未找到。")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"读取操作说明文档时发生错误: {str(e)}")
 
 
 if __name__ == '__main__':

@@ -26,16 +26,13 @@ class LSFFile:
 
         self._process_blocks()
 
-
-
-
     def _parse_file(self):
         blocks = []
         with open(self.file_path, 'rb') as file:
             datas = file.read()
         datas = [int(d) for d in datas]
         num = datas[10]
-        self.x = datas[12]+datas[13] * 256
+        self.x = datas[12] + datas[13] * 256
         self.y = datas[16] + datas[17] * 256
         self.type = datas[25]
         for i in range(num):
@@ -106,7 +103,6 @@ class LSFFile:
         if bi_key not in self.base_images:
             bi_key = min(self.base_images)
 
-
         for face_differences in self.face_differences:
             if face_differences not in fd_keys:
                 fd_keys[face_differences] = 1
@@ -125,26 +121,26 @@ class LSFFile:
             hl_key = 0
 
         # 添加块
-        if self.naked_image is not None:
-            blocks.append(self.naked_image)
         for base_image in self.base_images[bi_key]:
-            if base_image.x == 0 and base_image.y == 0 or base_image.type == 3:
-                blocks.append(base_image)
-
-        for face_differences in fd_keys:
-            if face_differences in self.face_differences:
-                blocks.append(self.face_differences[face_differences][fd_keys[face_differences]])
-
-        for base_image in self.base_images[bi_key]:
-            if (base_image.x != 0 or base_image.y != 0) and self.name[0] != '0':
-                blocks.append(base_image)
+            blocks.append(base_image)
 
         for face_effects in fe_keys:
             if face_effects in self.face_effects and fe_keys[face_effects] != 0:
                 blocks.append(self.face_effects[face_effects][fe_keys[face_effects]])
 
+        for face_differences in fd_keys:
+            if face_differences in self.face_differences:
+                blocks.append(self.face_differences[face_differences][fd_keys[face_differences]])
+
+        if self.naked_image is not None:
+            blocks.append(self.naked_image)
+
         if hl_key != 0:
             blocks.append(self.holy_light[hl_key])
+
+        # 将blocks按block.name排序
+        blocks.sort(key=lambda block: block.name)
+
         return blocks
 
 
@@ -159,5 +155,3 @@ if __name__ == '__main__':
     print(main_base_image)
     for block in operation_blocks:
         print(block)
-
-
