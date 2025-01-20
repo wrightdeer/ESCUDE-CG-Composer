@@ -55,7 +55,7 @@ class BottomBarComponent(QWidget):
 
         # 左右图标按键
         left_button = QPushButton()
-        left_button.setIcon(QIcon("BxLeftArrow.svg"))  # 假设左图标路径
+        left_button.setIcon(QIcon("static/BxLeftArrow.svg"))  # 假设左图标路径
         left_button.setIconSize(QSize(20, 20))  # 设置固定大小，使其保持正方形
         left_button.setFlat(True)  # 使按钮无边框
         left_button.setStyleSheet("background-color: transparent;")  # 使按钮无背景
@@ -68,7 +68,7 @@ class BottomBarComponent(QWidget):
         bottom_layout.addWidget(self.bottom_text_label)
 
         right_button = QPushButton()
-        right_button.setIcon(QIcon("BxRightArrow.svg"))  # 假设右图标路径
+        right_button.setIcon(QIcon("static/BxRightArrow.svg"))  # 假设右图标路径
         right_button.setIconSize(QSize(20, 20))  # 设置固定大小，使其保持正方形
         right_button.setFlat(True)  # 使按钮无边框
         right_button.setStyleSheet("background-color: transparent;")  # 使按钮无背景
