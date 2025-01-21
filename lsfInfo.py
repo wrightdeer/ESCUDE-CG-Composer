@@ -143,15 +143,3 @@ class LSFFile:
 
         return blocks
 
-
-if __name__ == '__main__':
-    lsf_file = LSFFile('data/EV_A02.lsf')
-    bi_key = 3  # 基础图片的ID
-    fd_keys = {1: 3, 2: 2, 3: 1}  # 脸部差分的启用情况
-    fe_keys = {1: 2}  # 脸部特效的启用情况
-    hl_key = 0  # 圣光效果的ID
-
-    main_base_image, operation_blocks = lsf_file.get_operation_blocks(bi_key, fd_keys, fe_keys, hl_key)
-    print(main_base_image)
-    for block in operation_blocks:
-        print(block)
