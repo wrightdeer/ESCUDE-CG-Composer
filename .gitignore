@@ -12,3 +12,9 @@ data/**/*.lsf
 
 # ignore the .idea directory
 .idea/
+
+# ignore the dist directory
+dist/
+
+# ignore the .spec directory
+.spec

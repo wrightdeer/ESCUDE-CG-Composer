@@ -14,3 +14,5 @@ if __name__ == '__main__':
     ex = SynthesisGUI()
     ex.show()
     sys.exit(app.exec_())
+
+# 注释说明：main.py 是项目的启动文件
